@@ -1,0 +1,39 @@
+name: Docker Compose On Master
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build And Start Compose Stack
+        run: docker compose up -d --build
+
+      - name: Wait For /ping
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8080/ping >/dev/null; then
+              echo "Service is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Service did not become healthy in time"
+          exit 1
+
+      - name: Show Compose Logs On Failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop Compose Stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
